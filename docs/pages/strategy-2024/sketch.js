@@ -405,6 +405,7 @@ function renumeroterPoints() {
     numeroPointStrategie = 1;
     for (let point of pointsStrategie) {
         point.numero = numeroPointStrategie++;
+        point.nom = `Stratégie ${point.numero}`;
     }
 }
 
