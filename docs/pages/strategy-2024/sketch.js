@@ -129,9 +129,6 @@ function setupUI() {
     btnLecture.parent('robotContainer');
     btnLecture.class('btn btn-light mr-2');
     btnLecture.mousePressed(() => {
-        if (etatRobot !== 'lecture') { // Si le robot n'est pas déjà en lecture, réinitialisez sa position
-            positionRobot = 0;
-        }
         etatRobot = 'lecture';
     });
 
