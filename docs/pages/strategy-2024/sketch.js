@@ -6,6 +6,10 @@ let cb_POI;
 let afficherPOI = true;
 let cb_DeleteOption;
 let deleteOption = false;
+let cb_Rotation;
+let rotationOption = false;
+let cb_Alert;
+let alertOption = false;
 let etatRobot = 'arrêté'; // Peut être 'lecture', 'pause', ou 'arrêté'
 let positionRobot = 0; // Indice du point de stratégie actuel
 let vitesseRobot = 1; // Vitesse de déplacement entre les points (modifiable par un curseur)
@@ -18,6 +22,14 @@ let pointsStrategie = [];
 let numeroPointStrategie = 1; // Commencez à numéroter à partir de 1
 let pointSelectionne = null;
 
+// Orientation
+let rotationActuelle = null;
+let rotationPointActuel = 0;
+let rotationSuivante = null;
+
+// On désactive le menu contextuel pour pouvoir éditer les rotation des points avec
+let noMenuArea = document.getElementById('p5-container');
+noMenuArea.addEventListener('contextmenu', event => event.preventDefault());
 
 function calculerEchelle() {
     // Le canvas vise à représenter une surface de 3m x 2m (3000mm x 2000mm)
@@ -32,7 +44,7 @@ function preload() {
 }
 
 function setup() {
-
+    angleMode(DEGREES); // Angle en degrés pour les rotations
     const container = select('#p5-container');
     let height = (windowHeight * ajustement) / 100;
     let width = (height * 2) / 3;
@@ -62,15 +74,25 @@ function draw() {
 
 function setupUI() {
     // Initialisation des checkboxes avec style Bootstrap
-    cb_POI = createCheckbox("POIs", afficherPOI);
+    cb_POI = createCheckbox(" POIs", afficherPOI);
     cb_POI.parent('checkboxContainer');
     cb_POI.changed(majPOI);
     cb_POI.class('form-check-label');
 
-    cb_DeleteOption = createCheckbox("Delete Mode", deleteOption);
+    cb_DeleteOption = createCheckbox(" Delete Mode", deleteOption);
     cb_DeleteOption.parent('checkboxContainer');
     cb_DeleteOption.changed(majDeleteOption);
     cb_DeleteOption.class('form-check-label');
+
+    cb_Rotation = createCheckbox(" Rotation", rotationOption);
+    cb_Rotation.parent('checkboxContainer');
+    cb_Rotation.changed(majRotationOption);
+    cb_Rotation.class('form-check-label');
+
+    cb_Alert = createCheckbox(" Alerte collision mur", alertOption);
+    cb_Alert.parent('checkboxContainer');
+    cb_Alert.changed(majAlertOption);
+    cb_Alert.class('form-check-label');    
 
     // Initialisation des boutons avec style Bootstrap
     let btnClear = createButton("Clear Stratégie");
@@ -107,9 +129,6 @@ function setupUI() {
     btnLecture.parent('robotContainer');
     btnLecture.class('btn btn-light mr-2');
     btnLecture.mousePressed(() => {
-        if (etatRobot !== 'lecture') { // Si le robot n'est pas déjà en lecture, réinitialisez sa position
-            positionRobot = 0;
-        }
         etatRobot = 'lecture';
     });
 
@@ -124,6 +143,7 @@ function setupUI() {
     btnStop.mousePressed(() => {
         etatRobot = 'arrêté';
         positionRobot = 0; // Réinitialiser la position du robot
+        rotationActuelle = null; // Réinitialiser la rotation actuelle
     });
 
     // Curseur de vitesse
@@ -146,10 +166,18 @@ function drawRobot() {
         let canvasX = lerp(pointActuel.y * echelleY, pointSuivant.y * echelleY, progression);
         let canvasY = lerp((3000 - pointActuel.x) * echelleX, (3000 - pointSuivant.x) * echelleX, progression);
 
+        let robotSize = 130 * (height/2000); // Taille dynamique selon la taille du plateau
+
+        if (pointActuel.rotation !== null) {
+            rotationActuelle = pointActuel.rotation;
+        }
+        
         stroke(255); // Couleur du contour
         strokeWeight(2); // Épaisseur du contour
         fill('rgba(10, 10, 10, 0.5)');
-        ellipse(canvasX, canvasY, 50, 50);
+        ellipse(canvasX, canvasY, robotSize);
+
+        line(canvasX, canvasY, canvasX + robotSize/2 * cos(rotationActuelle-90), canvasY + robotSize/2 * sin(rotationActuelle-90));
 
         if (etatRobot === 'lecture') {
             if (indexActuel < pointsStrategie.length - 1) { // Empêche l'incrémentation au-delà du dernier point
@@ -159,16 +187,20 @@ function drawRobot() {
     }
 }
 
-
-
-
-
 function majDeleteOption() {
     deleteOption = cb_DeleteOption.checked();
 }
 
 function majPOI() {
     afficherPOI = cb_POI.checked();
+}
+
+function majRotationOption() {
+    rotationOption = cb_Rotation.checked();
+}
+
+function majAlertOption() {
+    alertOption = cb_Alert.checked();
 }
 
 function drawPOI() {
@@ -228,6 +260,16 @@ function drawPoint(point) {
     // Vérifier si la souris est proche du point pour décider si on affiche un contour
     let estProche = dist(mouseX, mouseY, canvasX, canvasY) < taillePoint / 2;
 
+    // Contour blanc même si la souris se trouve en dehors du canvas
+    if (pointSelectionne === point && 
+        (Math.round(3000 - (mouseY / echelleY)) > 3000 || 
+        Math.round(mouseX / echelleX) > 2000 || 
+        Math.round(3000 - (mouseY / echelleY)) < 0 || 
+        Math.round(mouseX / echelleX) < 0))
+    {
+        estProche = true;
+    }
+
     // Si la souris est proche, définir le contour en blanc
     if (estProche) {
         stroke(255); // Couleur du contour
@@ -236,20 +278,22 @@ function drawPoint(point) {
         noStroke();
     }
 
-    fill(point.couleur);
+    fill(point.color);
     ellipse(canvasX, canvasY, taillePoint, taillePoint);
 
     // Réinitialiser le contour pour le texte et autres éléments
     noStroke();
 
     // Afficher le numéro au centre du point, si disponible
-    if (point.numero !== undefined) {
+    if (point.number !== undefined) {
         fill(255); // Couleur du numéro
         textAlign(CENTER, CENTER);
-        text(point.numero, canvasX, canvasY);
+        text(point.number, canvasX, canvasY);
     }
 
     if (estProche) {
+        let isPOI = pois.find(poi => poi.x === point.x && poi.y === point.y);
+        let isUserPoint = pointsStrategie.find(userPoint => userPoint.x === point.x && userPoint.y === point.y);
         textSize(20);
         fill(0); // Couleur du texte
         stroke(255); // Contour du texte pour améliorer la lisibilité
@@ -264,8 +308,14 @@ function drawPoint(point) {
 
         // Appliquer l'alignement et le décalage pour le nom et les coordonnées
         textAlign((mouseX < width / 2) ? LEFT : RIGHT, (mouseY < height / 2) ? BOTTOM : TOP);
-        text(`${point.nom}`, canvasX + offsetX, canvasY + offsetY);
-        text(`(${point.x}, ${point.y})`, canvasX + offsetX, canvasY + offsetY + 20);
+        if ((point.number !== undefined && isPOI !== undefined && isUserPoint !== undefined) || (point.number !== undefined && isPOI === undefined && isUserPoint !== undefined) || (point.number === undefined && isPOI !== undefined && isUserPoint === undefined))
+        {
+            text(`${point.name}`, canvasX + offsetX, canvasY + offsetY);
+            if (point.rotation !== null && point.rotation !== undefined)
+                text(`(${point.x}, ${point.y}, ${point.rotation.toFixed(2)}°)`, canvasX + offsetX, canvasY + offsetY + 20);
+            else
+                text(`(${point.x}, ${point.y})`, canvasX + offsetX, canvasY + offsetY + 20);
+        }
 
         // Réinitialisez le contour pour les autres éléments à dessiner après le texte
         noStroke();
@@ -304,53 +354,55 @@ function extractPOIs() {
             const name = match[1];
             const x = parseInt(match[2], 10);
             const y = parseInt(match[3], 10);
-            const numero = undefined; // ou un numéro spécifique si disponible
-            pois.push({ nom: name, x: x, y: y, couleur: "red", numero: numero });
+            const number = undefined; // ou un numéro spécifique si disponible
+            pois.push({ name: name, x: x, y: y, color: "red", number: number });
         }
     });
 }
-function mousePressed() {
-    if (deleteOption && mouseX > 0 && mouseX < width && mouseY > 0 && mouseY < height) {
-        // Logique de suppression des points
-        for (let i = pointsStrategie.length - 1; i >= 0; i--) {
-            let point = pointsStrategie[i];
-            let canvasX = point.y * echelleY;
-            let canvasY = (3000 - point.x) * echelleX;
-            if (dist(mouseX, mouseY, canvasX, canvasY) < 15) {
-                // Supprime le point et met à jour les numéros des points suivants
-                pointsStrategie.splice(i, 1);
-                renumeroterPoints();
-                return; // Arrêtez la recherche dès qu'un point est trouvé et supprimé
-            }
-        }
-    } else {
-        let pointTrouve = false;
-        // Tentez d'abord de sélectionner un point de stratégie existant pour le déplacer
-        for (let point of pointsStrategie) {
-            let canvasX = point.y * echelleY;
-            let canvasY = (3000 - point.x) * echelleX;
-            if (dist(mouseX, mouseY, canvasX, canvasY) < 15) {
-                pointSelectionne = point;
-                pointTrouve = true;
-                break; // Un point est trouvé pour déplacement, arrêter la recherche
-            }
-        }
 
-        if (!pointTrouve && mouseX > 0 && mouseX < width && mouseY > 0 && mouseY < height) {
-            // Si aucun point de stratégie n'est sélectionné, vérifiez l'aimantation ou créez un nouveau point
-            verifierAimantationEtCreerPoint();
+function mousePressed() {
+    if (mouseButton === LEFT)
+    {
+        if (deleteOption && mouseX > 0 && mouseX < width && mouseY > 0 && mouseY < height) {
+            // Logique de suppression des points
+            for (let i = pointsStrategie.length - 1; i >= 0; i--) {
+                let point = pointsStrategie[i];
+                let canvasX = point.y * echelleY;
+                let canvasY = (3000 - point.x) * echelleX;
+                if (dist(mouseX, mouseY, canvasX, canvasY) < 15) {
+                    // Supprime le point et met à jour les numéros des points suivants
+                    pointsStrategie.splice(i, 1);
+                    renumeroterPoints();
+                    return; // Arrêtez la recherche dès qu'un point est trouvé et supprimé
+                }
+            }
+        } else {
+            let pointTrouve = false;
+            // Tentez d'abord de sélectionner un point de stratégie existant pour le déplacer
+            for (let point of pointsStrategie) {
+                let canvasX = point.y * echelleY;
+                let canvasY = (3000 - point.x) * echelleX;
+                if (dist(mouseX, mouseY, canvasX, canvasY) < 15) {
+                    pointSelectionne = point;
+                    pointTrouve = true;
+                    break; // Un point est trouvé pour déplacement, arrêter la recherche
+                }
+            }
+
+            if (!pointTrouve && mouseX > 0 && mouseX < width && mouseY > 0 && mouseY < height) {
+                // Si aucun point de stratégie n'est sélectionné, vérifiez l'aimantation ou créez un nouveau point
+                verifierAimantationEtCreerPoint();
+            }
         }
     }
 }
 
 
-
-
-
 function renumeroterPoints() {
     numeroPointStrategie = 1;
     for (let point of pointsStrategie) {
-        point.numero = numeroPointStrategie++;
+        point.number = numeroPointStrategie++;
+        point.name = `Stratégie ${point.number}`;
     }
 }
 
@@ -364,7 +416,7 @@ function mouseDragged() {
                 // Si proche d'un POI, aimantez le point
                 pointSelectionne.x = poi.x;
                 pointSelectionne.y = poi.y;
-                pointSelectionne.couleur = "green"; // Changez la couleur pour indiquer l'aimantation
+                pointSelectionne.color = "green"; // Changez la couleur pour indiquer l'aimantation
                 aimante = true;
                 break;
             }
@@ -374,7 +426,24 @@ function mouseDragged() {
             // Si le point n'est pas aimanté, mettez à jour selon la position de la souris et remettez en bleu
             pointSelectionne.x = Math.round((3000 - (mouseY / echelleY)));
             pointSelectionne.y = Math.round(mouseX / echelleX);
-            pointSelectionne.couleur = "blue"; // La couleur originale des points de stratégie
+            if (pointSelectionne.rotation !== null)
+                pointSelectionne.color = "magenta"; // La couleur de la rotation
+            else
+                pointSelectionne.color = "blue"; // La couleur originale des points de stratégie
+
+            // Restrictions des bords du terrain
+            if (pointSelectionne.x < 0)
+                pointSelectionne.x = 0;
+
+            if (pointSelectionne.x > 3000)
+                pointSelectionne.x = 3000;
+
+            if (pointSelectionne.y < 0)
+                pointSelectionne.y = 0;
+
+            if (pointSelectionne.y > 2000)
+                pointSelectionne.y = 2000;
+                
         }
     }
 }
@@ -382,16 +451,23 @@ function mouseDragged() {
 
 function verifierAimantationEtCreerPoint() {
     let aimante = false;
+    let robotSize = 130*2 * (height/2000); // Taille dynamique selon la taille du plateau
     for (let poi of pois) {
         let canvasX = poi.y * echelleY;
         let canvasY = (3000 - poi.x) * echelleX;
+
         if (dist(mouseX, mouseY, canvasX, canvasY) < 15) {
+
+            if (alertOption && (poi.x - robotSize < 0 || poi.x + robotSize > 3000 || poi.y - robotSize < 0 || poi.y + robotSize > 2000))
+                alert("Le point proche du bord du terrain, le robot risque une collision avec le mur");
+
             pointsStrategie.push({
                 x: poi.x,
                 y: poi.y,
-                nom: `Stratégie ${numeroPointStrategie}`,
-                couleur: "green",
-                numero: numeroPointStrategie++
+                rotation: null, // Aucune rotation par défaut
+                name: `Stratégie ${numeroPointStrategie}`,
+                color: "green",
+                number: numeroPointStrategie++
             });
             aimante = true;
             break;
@@ -402,18 +478,73 @@ function verifierAimantationEtCreerPoint() {
         // Crée un nouveau point à l'emplacement de la souris si non aimanté
         let xTerrain = Math.round((3000 - (mouseY / echelleY)));
         let yTerrain = Math.round(mouseX / echelleX);
+
+        if (alertOption && (xTerrain - robotSize < 0 || xTerrain + robotSize > 3000 || yTerrain - robotSize < 0 || yTerrain + robotSize > 2000))
+            alert("Le point proche du bord du terrain, le robot risque une collision avec le mur");
+
         pointsStrategie.push({
             x: xTerrain,
             y: yTerrain,
-            nom: `Stratégie ${numeroPointStrategie}`,
-            couleur: "blue",
-            numero: numeroPointStrategie++
+            rotation: null, // Aucune rotation par défaut
+            name: `Stratégie ${numeroPointStrategie}`,
+            color: "blue",
+            number: numeroPointStrategie++
         });
     }
 }
 
 
 function mouseReleased() {
+    if (rotationOption) // Verif si l'option de modif rotation activée
+    {
+        if (mouseButton === RIGHT && 
+            (mouseX / echelleX) > 0 && 
+            (mouseX / echelleX) < 2000 && 
+            (3000 - (mouseY / echelleY)) > 0 && 
+            (3000 - (mouseY / echelleY)) < 3000) // Verif si le clic droit est dans le terrain
+        {
+            let pointTrouve = false;
+            for (let point of pointsStrategie) {
+                let canvasX = point.y * echelleY;
+                let canvasY = (3000 - point.x) * echelleX;
+                if (dist(mouseX, mouseY, canvasX, canvasY) < 15) {
+                    pointSelectionne = point;
+                    pointTrouve = true;
+                    break; // Un point est trouvé pour déplacement, arrêter la recherche
+                }
+            }
+
+            if (pointTrouve)
+            {
+                var inputRotation = "thisisnotanumber";
+
+                while (inputRotation != "" && inputRotation != null && inputRotation != "null" && isNaN(inputRotation))
+                {
+                    inputRotation = prompt(`Entrer la rotation que va effectuer le robot au point (${pointSelectionne.x}, ${pointSelectionne.y})`);
+                    if (inputRotation.includes(","))
+                        inputRotation = inputRotation.replace(",", ".");
+                }
+
+                if (inputRotation === "null" || inputRotation === "" || inputRotation === null)
+                {
+                    inputRotation = null;
+                    pointSelectionne.rotation = inputRotation;
+                    pointSelectionne.color = "blue";
+                }
+                else if ((inputRotation / 360) < -1 || (inputRotation % 360) > 1)
+                {
+                    inputRotation = abs(inputRotation - 360 * parseInt(inputRotation / 360));
+                    pointSelectionne.rotation = inputRotation;
+                    pointSelectionne.color = "magenta";
+                }
+                else
+                {
+                    pointSelectionne.rotation = inputRotation;
+                    pointSelectionne.color = "magenta";
+                }
+            }
+        }
+    }
     pointSelectionne = null; // Réinitialiser le point sélectionné après le glissement
 }
 
@@ -431,7 +562,7 @@ function loadStrategie() {
     if (strategie) {
         pointsStrategie = JSON.parse(strategie);
         // Assurez-vous que le numéro suit correctement le dernier point ajouté
-        numeroPointStrategie = pointsStrategie.length ? pointsStrategie[pointsStrategie.length - 1].numero + 1 : 1;
+        numeroPointStrategie = pointsStrategie.length ? pointsStrategie[pointsStrategie.length - 1].number + 1 : 1;
     }
 }
 
@@ -454,7 +585,7 @@ function handleFile(file) {
             try {
                 let contents = e.target.result;
                 pointsStrategie = JSON.parse(contents);
-                numeroPointStrategie = pointsStrategie.length ? pointsStrategie[pointsStrategie.length - 1].numero + 1 : 1;
+                numeroPointStrategie = pointsStrategie.length ? pointsStrategie[pointsStrategie.length - 1].number + 1 : 1;
                 redraw(); // Force le redessinage pour afficher les points importés
             } catch (error) {
                 console.error("Erreur lors du parsing du fichier JSON : ", error);
@@ -474,10 +605,10 @@ function exporterCPP() {
         let correspondancePOI = pois.find(poi => poi.x === point.x && poi.y === point.y);
         if (correspondancePOI) {
             // Utiliser le nom du POI s'il y a correspondance
-            contenuCPP += `    motion.go(POI::${correspondancePOI.nom}); // Numero ${point.numero}\n`;
+            contenuCPP += `    motion.go(POI::${correspondancePOI.name}); // Numero ${point.number}\n`;
         } else {
             // Sinon, utiliser les coordonnées x et y
-            contenuCPP += `    motion.go(${point.x},${point.y}); // Numero ${point.numero}\n`;
+            contenuCPP += `    motion.go(${point.x},${point.y}); // Numero ${point.number}\n`;
         }
     });
     contenuCPP += "}\n";
