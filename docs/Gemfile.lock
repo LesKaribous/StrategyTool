@@ -3,11 +3,14 @@ GEM
   specs:
     addressable (2.8.6)
       public_suffix (>= 2.0.2, < 6.0)
+    cgi (0.4.1)
     colorator (1.1.0)
     concurrent-ruby (1.2.3)
     em-websocket (0.5.3)
       eventmachine (>= 0.12.9)
       http_parser.rb (~> 0)
+    erb (4.0.4)
+      cgi (>= 0.3.3)
     eventmachine (1.2.7)
     ffi (1.16.3)
     ffi (1.16.3-x64-mingw-ucrt)
@@ -81,6 +84,7 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
+  erb
   jekyll (~> 4.0)
   jekyll-include-cache
   jekyll-remote-theme

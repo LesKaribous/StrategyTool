@@ -278,17 +278,17 @@ function drawPoint(point) {
         noStroke();
     }
 
-    fill(point.couleur);
+    fill(point.color);
     ellipse(canvasX, canvasY, taillePoint, taillePoint);
 
     // Réinitialiser le contour pour le texte et autres éléments
     noStroke();
 
     // Afficher le numéro au centre du point, si disponible
-    if (point.numero !== undefined) {
+    if (point.number !== undefined) {
         fill(255); // Couleur du numéro
         textAlign(CENTER, CENTER);
-        text(point.numero, canvasX, canvasY);
+        text(point.number, canvasX, canvasY);
     }
 
     if (estProche) {
@@ -308,9 +308,9 @@ function drawPoint(point) {
 
         // Appliquer l'alignement et le décalage pour le nom et les coordonnées
         textAlign((mouseX < width / 2) ? LEFT : RIGHT, (mouseY < height / 2) ? BOTTOM : TOP);
-        if ((point.numero !== undefined && isPOI !== undefined && isUserPoint !== undefined) || (point.numero !== undefined && isPOI === undefined && isUserPoint !== undefined) || (point.numero === undefined && isPOI !== undefined && isUserPoint === undefined))
+        if ((point.number !== undefined && isPOI !== undefined && isUserPoint !== undefined) || (point.number !== undefined && isPOI === undefined && isUserPoint !== undefined) || (point.number === undefined && isPOI !== undefined && isUserPoint === undefined))
         {
-            text(`${point.nom}`, canvasX + offsetX, canvasY + offsetY);
+            text(`${point.name}`, canvasX + offsetX, canvasY + offsetY);
             if (point.rotation !== null && point.rotation !== undefined)
                 text(`(${point.x}, ${point.y}, ${point.rotation.toFixed(2)}°)`, canvasX + offsetX, canvasY + offsetY + 20);
             else
@@ -354,8 +354,8 @@ function extractPOIs() {
             const name = match[1];
             const x = parseInt(match[2], 10);
             const y = parseInt(match[3], 10);
-            const numero = undefined; // ou un numéro spécifique si disponible
-            pois.push({ nom: name, x: x, y: y, couleur: "red", numero: numero });
+            const number = undefined; // ou un numéro spécifique si disponible
+            pois.push({ name: name, x: x, y: y, color: "red", number: number });
         }
     });
 }
@@ -401,8 +401,8 @@ function mousePressed() {
 function renumeroterPoints() {
     numeroPointStrategie = 1;
     for (let point of pointsStrategie) {
-        point.numero = numeroPointStrategie++;
-        point.nom = `Stratégie ${point.numero}`;
+        point.number = numeroPointStrategie++;
+        point.name = `Stratégie ${point.number}`;
     }
 }
 
@@ -416,7 +416,7 @@ function mouseDragged() {
                 // Si proche d'un POI, aimantez le point
                 pointSelectionne.x = poi.x;
                 pointSelectionne.y = poi.y;
-                pointSelectionne.couleur = "green"; // Changez la couleur pour indiquer l'aimantation
+                pointSelectionne.color = "green"; // Changez la couleur pour indiquer l'aimantation
                 aimante = true;
                 break;
             }
@@ -427,9 +427,9 @@ function mouseDragged() {
             pointSelectionne.x = Math.round((3000 - (mouseY / echelleY)));
             pointSelectionne.y = Math.round(mouseX / echelleX);
             if (pointSelectionne.rotation !== null)
-                pointSelectionne.couleur = "magenta"; // La couleur de la rotation
+                pointSelectionne.color = "magenta"; // La couleur de la rotation
             else
-                pointSelectionne.couleur = "blue"; // La couleur originale des points de stratégie
+                pointSelectionne.color = "blue"; // La couleur originale des points de stratégie
 
             // Restrictions des bords du terrain
             if (pointSelectionne.x < 0)
@@ -465,9 +465,9 @@ function verifierAimantationEtCreerPoint() {
                 x: poi.x,
                 y: poi.y,
                 rotation: null, // Aucune rotation par défaut
-                nom: `Stratégie ${numeroPointStrategie}`,
-                couleur: "green",
-                numero: numeroPointStrategie++
+                name: `Stratégie ${numeroPointStrategie}`,
+                color: "green",
+                number: numeroPointStrategie++
             });
             aimante = true;
             break;
@@ -486,9 +486,9 @@ function verifierAimantationEtCreerPoint() {
             x: xTerrain,
             y: yTerrain,
             rotation: null, // Aucune rotation par défaut
-            nom: `Stratégie ${numeroPointStrategie}`,
-            couleur: "blue",
-            numero: numeroPointStrategie++
+            name: `Stratégie ${numeroPointStrategie}`,
+            color: "blue",
+            number: numeroPointStrategie++
         });
     }
 }
@@ -529,18 +529,18 @@ function mouseReleased() {
                 {
                     inputRotation = null;
                     pointSelectionne.rotation = inputRotation;
-                    pointSelectionne.couleur = "blue";
+                    pointSelectionne.color = "blue";
                 }
                 else if ((inputRotation / 360) < -1 || (inputRotation % 360) > 1)
                 {
                     inputRotation = abs(inputRotation - 360 * parseInt(inputRotation / 360));
                     pointSelectionne.rotation = inputRotation;
-                    pointSelectionne.couleur = "magenta";
+                    pointSelectionne.color = "magenta";
                 }
                 else
                 {
                     pointSelectionne.rotation = inputRotation;
-                    pointSelectionne.couleur = "magenta";
+                    pointSelectionne.color = "magenta";
                 }
             }
         }
@@ -562,7 +562,7 @@ function loadStrategie() {
     if (strategie) {
         pointsStrategie = JSON.parse(strategie);
         // Assurez-vous que le numéro suit correctement le dernier point ajouté
-        numeroPointStrategie = pointsStrategie.length ? pointsStrategie[pointsStrategie.length - 1].numero + 1 : 1;
+        numeroPointStrategie = pointsStrategie.length ? pointsStrategie[pointsStrategie.length - 1].number + 1 : 1;
     }
 }
 
@@ -585,7 +585,7 @@ function handleFile(file) {
             try {
                 let contents = e.target.result;
                 pointsStrategie = JSON.parse(contents);
-                numeroPointStrategie = pointsStrategie.length ? pointsStrategie[pointsStrategie.length - 1].numero + 1 : 1;
+                numeroPointStrategie = pointsStrategie.length ? pointsStrategie[pointsStrategie.length - 1].number + 1 : 1;
                 redraw(); // Force le redessinage pour afficher les points importés
             } catch (error) {
                 console.error("Erreur lors du parsing du fichier JSON : ", error);
@@ -605,10 +605,10 @@ function exporterCPP() {
         let correspondancePOI = pois.find(poi => poi.x === point.x && poi.y === point.y);
         if (correspondancePOI) {
             // Utiliser le nom du POI s'il y a correspondance
-            contenuCPP += `    motion.go(POI::${correspondancePOI.nom}); // Numero ${point.numero}\n`;
+            contenuCPP += `    motion.go(POI::${correspondancePOI.name}); // Numero ${point.number}\n`;
         } else {
             // Sinon, utiliser les coordonnées x et y
-            contenuCPP += `    motion.go(${point.x},${point.y}); // Numero ${point.numero}\n`;
+            contenuCPP += `    motion.go(${point.x},${point.y}); // Numero ${point.number}\n`;
         }
     });
     contenuCPP += "}\n";
